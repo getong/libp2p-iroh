@@ -4,6 +4,7 @@ use actor_helper::{Action, Actor, ActorError, Handle, Receiver, act_ok};
 use futures::{FutureExt, future::BoxFuture};
 use iroh::{EndpointId, protocol::ProtocolHandler};
 use libp2p::PeerId;
+use rand::RngExt;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
@@ -98,7 +99,8 @@ impl Transport {
             (sk, pid)
         } else {
             tracing::debug!("Transport::new - Generating new keypair");
-            let sk = iroh::SecretKey::generate(&mut rand::rng());
+            let mut rng = rand::rng();
+            let sk = iroh::SecretKey::from_bytes(&rng.random());
             let node_id = sk.public();
             let node_id_bytes = node_id.as_bytes();
             let ed25519_pubkey = libp2p::identity::ed25519::PublicKey::try_from_bytes(
@@ -323,15 +325,16 @@ impl libp2p::Transport for Transport {
             .map_err(|_| false)
             .unwrap_or(None);
         if let Some(current_id) = listener_id
-            && current_id == id {
-                self.protocol
-                    .api
-                    .call_blocking(act_ok!(actor => async move {
-                        actor.listener_id = None;
-                    }))
-                    .ok();
-                return true;
-            }
+            && current_id == id
+        {
+            self.protocol
+                .api
+                .call_blocking(act_ok!(actor => async move {
+                    actor.listener_id = None;
+                }))
+                .ok();
+            return true;
+        }
         false
     }
 
